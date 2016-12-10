@@ -2,13 +2,17 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <gmp.h>
+#include <time.h>
 #include "../tables/primes.c"
+
+#define ITERATION_MAX 8192
 
 typedef enum {DEFINITELY_NOT = 0, PROBABLY, DEFINITELY} PRIME_CERTAINTY;
 extern char *optarg;
 extern int optind, opterr, optopt;
 
 gmp_randstate_t state;
+gmp_randstate_t state2;
 
 void generate_prime_candidate_of_size(mpz_t rop, int size) {
 	//genera aleatorio entre 0 y 2^(n-1)
@@ -59,17 +63,26 @@ PRIME_CERTAINTY Miller_Rabin_Test(const mpz_t n, int reps) {
 	
 	for (i = 0; i < reps; i++) {
 		//encuentra base aleatoria
-		mpz_urandomm(base, state, p);
+		mpz_urandomm(base, state2, p);
 		//base <- [2, p-2]
 		mpz_add_ui(base, base, 2);
 		
 		//rem = a^m % n
 		mpz_powm(rem, base, m, n);
 		
-		//pase inmediato: a^m == +-1 mod n
+		//pase inmediato: a^m == 1 mod n
 		if (mpz_cmpabs_ui(rem, 2) < 0) {
 			continue;
 		}
+		mpz_add_ui(rem, rem, 1L);	//+1
+		mpz_sub(rem, rem, n);		//-n
+		//pase inmediato: a^m == -1 mod n
+		if (mpz_sgn(rem) == 0) {
+			continue;
+		}
+		//revierte si no pasa
+		mpz_add(rem, rem, n);		//+n
+		mpz_sub_ui(rem, rem, 1L);	//-1
 		
 		for (j = 1; j < k; j++) {
 			mpz_powm_ui(rem, rem, 2L, n);
@@ -160,42 +173,54 @@ int main (int argc,char *argv[]) {
 	}
 	
 	gmp_randinit_default(state);
+	gmp_randseed_ui(state, time(NULL));
+	gmp_randinit_default(state2);
+	gmp_randseed_ui(state2, time(NULL));
 	
 	mpz_t n;
 	mpz_init(n);
 	
-	generate_prime_candidate_of_size(n, bitlen);
-	
 	int i;
-	for (i = 0; i < test_iters; i++) {
 	
-		int ret = Miller_Rabin_Test(n, test_iters);
-		int gmpret = mpz_probab_prime_p(n, test_iters);
-		
-		gmp_printf("Para %ZX los resultados son:\n", n);
-		printf("\tManual: ");
-		if (ret == DEFINITELY_NOT) {
-			printf("Compuesto\n");
-		} else if (ret == PROBABLY) {
-			printf("Probablemente\n");
-		} else {
-			printf("Definitivamente\n");
-		}
-		printf("\tGMP: ");
-		if (gmpret == DEFINITELY_NOT) {
-			printf("Compuesto\n");
-		} else if (gmpret == PROBABLY) {
-			printf("Probablemente\n");
-		} else {
-			printf("Definitivamente\n");
-		}
-		if (gmpret > DEFINITELY_NOT) {
-			break;
-		}
-		mpz_add_ui(n, n, 2L);
+	FILE* f = fopen("suc.txt", "w");
+	if (!f) {
+		perror(NULL);
+		return EXIT_FAILURE;
 	}
+	
+	
+	for (i = 0; i < ITERATION_MAX; i++) {
+		generate_prime_candidate_of_size(n, bitlen);
+	
+		//int ret = Miller_Rabin_Test(n, test_iters);
+		int gmpret = mpz_probab_prime_p(n, test_iters);
+		if (gmpret > DEFINITELY_NOT) {
+			fprintf(f, "%d\n", i);
+		}
+	}
+	
+	fclose(f);
+	
+	/*gmp_printf("Para %Zd los resultados son:\n", n);
+	printf("\tManual: ");
+	if (ret == DEFINITELY_NOT) {
+		printf("Compuesto\n");
+	} else if (ret == PROBABLY) {
+		printf("Probablemente\n");
+	} else {
+		printf("Definitivamente\n");
+	}
+	printf("\tGMP: ");
+	if (gmpret == DEFINITELY_NOT) {
+		printf("Compuesto\n");
+	} else if (gmpret == PROBABLY) {
+		printf("Probablemente\n");
+	} else {
+		printf("Definitivamente\n");
+	}*/
 	
 	mpz_clear(n);
 	gmp_randclear(state);
+	gmp_randclear(state2);
 	return 0;
 }

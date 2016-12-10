@@ -9,7 +9,7 @@ $(EXE1): $(SRC)$(EXE1).c
 	$(CC) -g -o $@ $< -lgmp -lm
 	
 $(EXE2): $(SRC)$(EXE2).c
-	$(CC) -g -o $@ $< -lgmp -lm
+	$(CC) -g -o $@ $< -lgmp -lm -Ofast
 	
 clean:
 	rm -f $(EXE1) $(EXE2)
