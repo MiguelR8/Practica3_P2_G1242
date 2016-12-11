@@ -5,7 +5,7 @@
 #include <time.h>
 #include "../tables/primes.c"
 
-#define ITERATION_MAX 8192
+#define ITERATION_MAX 32768
 
 typedef enum {DEFINITELY_NOT = 0, PROBABLY, DEFINITELY} PRIME_CERTAINTY;
 extern char *optarg;
@@ -172,10 +172,12 @@ int main (int argc,char *argv[]) {
 		return -1;
 	}
 	
+	long t = 1481383636L;//time(NULL);
+	//printf("%ld\n", t);
 	gmp_randinit_default(state);
-	gmp_randseed_ui(state, time(NULL));
+	gmp_randseed_ui(state, t);
 	gmp_randinit_default(state2);
-	gmp_randseed_ui(state2, time(NULL));
+	gmp_randseed_ui(state2, t);
 	
 	mpz_t n;
 	mpz_init(n);
