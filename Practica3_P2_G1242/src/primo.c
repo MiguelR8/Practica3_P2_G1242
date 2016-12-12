@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <gmp.h>
-#include <time.h>
+#include <sys/time.h>
 #include "../tables/primes.c"
 
-#define ITERATION_MAX 32768
+#define ITERATION_MAX 16000
 
 typedef enum {DEFINITELY_NOT = 0, PROBABLY, DEFINITELY} PRIME_CERTAINTY;
 extern char *optarg;
@@ -47,7 +47,7 @@ PRIME_CERTAINTY Miller_Rabin_Test(const mpz_t n, int reps) {
 			return DEFINITELY_NOT;
 		}
 	}
-	//no funciona
+	
 	mpz_t base;
 	unsigned long k;
 	mpz_t m;
@@ -66,6 +66,7 @@ PRIME_CERTAINTY Miller_Rabin_Test(const mpz_t n, int reps) {
 		mpz_urandomm(base, state2, p);
 		//base <- [2, p-2]
 		mpz_add_ui(base, base, 2);
+		//gmp_printf("base: %ZX\n", base);
 		
 		//rem = a^m % n
 		mpz_powm(rem, base, m, n);
@@ -172,12 +173,20 @@ int main (int argc,char *argv[]) {
 		return -1;
 	}
 	
+	if (fout == NULL) {
+		fout = stdout;
+	}
+	
 	long t = 1481383636L;//time(NULL);
 	//printf("%ld\n", t);
 	gmp_randinit_default(state);
 	gmp_randseed_ui(state, t);
+	
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	
 	gmp_randinit_default(state2);
-	gmp_randseed_ui(state2, t);
+	gmp_randseed_ui(state2, tv.tv_sec + tv.tv_usec);
 	
 	mpz_t n;
 	mpz_init(n);
@@ -193,32 +202,32 @@ int main (int argc,char *argv[]) {
 	
 	for (i = 0; i < ITERATION_MAX; i++) {
 		generate_prime_candidate_of_size(n, bitlen);
-	
-		//int ret = Miller_Rabin_Test(n, test_iters);
-		int gmpret = mpz_probab_prime_p(n, test_iters);
-		if (gmpret > DEFINITELY_NOT) {
+		//printf("It %i\n", i);
+		int ret = Miller_Rabin_Test(n, test_iters);
+		//int gmpret = mpz_probab_prime_p(n, test_iters);
+		if (ret > DEFINITELY_NOT) {
 			fprintf(f, "%d\n", i);
 		}
 	}
 	
 	fclose(f);
 	
-	/*gmp_printf("Para %Zd los resultados son:\n", n);
-	printf("\tManual: ");
+	/*gmp_fprintf(fout, "Para %Zd los resultados son:\n", n);
+	fprintf(fout, "\tManual: ");
 	if (ret == DEFINITELY_NOT) {
-		printf("Compuesto\n");
+		fprintf(fout, "Compuesto\n");
 	} else if (ret == PROBABLY) {
-		printf("Probablemente\n");
+		fprintf(fout, "Probablemente\n");
 	} else {
-		printf("Definitivamente\n");
+		fprintf(fout, "Definitivamente\n");
 	}
-	printf("\tGMP: ");
+	fprintf(fout, "\tGMP: ");
 	if (gmpret == DEFINITELY_NOT) {
-		printf("Compuesto\n");
+		fprintf(fout, "Compuesto\n");
 	} else if (gmpret == PROBABLY) {
-		printf("Probablemente\n");
+		fprintf(fout, "Probablemente\n");
 	} else {
-		printf("Definitivamente\n");
+		fprintf(fout, "Definitivamente\n");
 	}*/
 	
 	mpz_clear(n);
