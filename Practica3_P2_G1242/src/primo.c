@@ -3,9 +3,8 @@
 #include <getopt.h>
 #include <gmp.h>
 #include <sys/time.h>
+#include <time.h>
 #include "../tables/primes.c"
-
-#define ITERATION_MAX 16000
 
 typedef enum {DEFINITELY_NOT = 0, PROBABLY, DEFINITELY} PRIME_CERTAINTY;
 extern char *optarg;
@@ -33,8 +32,6 @@ PRIME_CERTAINTY Miller_Rabin_Test(const mpz_t n, int reps) {
 	mpz_t p;
 	//Primer test, no es multiplo de los primeros 2000 primos
 	mpz_init(p);
-	//TODO: possible optimization, binary search in table
-	//TODO: possible optimization, iterate from top until table element is smaller
 	for (i = 0; i < PRIME_TABLE_SIZE; i++) {
 		if (mpz_cmp_ui(n, primes[i]) == 0) {
 			mpz_clears(p, NULL);
@@ -62,11 +59,12 @@ PRIME_CERTAINTY Miller_Rabin_Test(const mpz_t n, int reps) {
 	mpz_sub_ui(p, n, 4);
 	
 	for (i = 0; i < reps; i++) {
-		//encuentra base aleatoria
-		mpz_urandomm(base, state2, p);
-		//base <- [2, p-2]
-		mpz_add_ui(base, base, 2);
-		//gmp_printf("base: %ZX\n", base);
+		//encuentra base aleatoria (primo menor que candidato)
+		do {
+			mpz_set_ui(base, PRIME_TABLE_SIZE);
+			mpz_urandomm(base, state2, base);	//get random index
+		} while (mpz_cmp_ui(n1, primes[mpz_get_ui(base)]) < 0);	//debe ser menor que n-1
+		mpz_set_ui(base, primes[mpz_get_ui(base)]);
 		
 		//rem = a^m % n
 		mpz_powm(rem, base, m, n);
@@ -110,7 +108,6 @@ PRIME_CERTAINTY Miller_Rabin_Test(const mpz_t n, int reps) {
 			mpz_clear(p);
 			return DEFINITELY_NOT;
 		}
-		
 	}
 	mpz_clears(base, m, n1, rem, NULL);
 	mpz_clear(p);
@@ -177,8 +174,7 @@ int main (int argc,char *argv[]) {
 		fout = stdout;
 	}
 	
-	long t = 1481383636L;//time(NULL);
-	//printf("%ld\n", t);
+	long t = time(NULL);
 	gmp_randinit_default(state);
 	gmp_randseed_ui(state, t);
 	
@@ -191,28 +187,11 @@ int main (int argc,char *argv[]) {
 	mpz_t n;
 	mpz_init(n);
 	
-	int i;
+	generate_prime_candidate_of_size(n, bitlen);
+	int ret = Miller_Rabin_Test(n, test_iters);
+	int gmpret = mpz_probab_prime_p(n, test_iters);
 	
-	FILE* f = fopen("suc.txt", "w");
-	if (!f) {
-		perror(NULL);
-		return EXIT_FAILURE;
-	}
-	
-	
-	for (i = 0; i < ITERATION_MAX; i++) {
-		generate_prime_candidate_of_size(n, bitlen);
-		//printf("It %i\n", i);
-		int ret = Miller_Rabin_Test(n, test_iters);
-		//int gmpret = mpz_probab_prime_p(n, test_iters);
-		if (ret > DEFINITELY_NOT) {
-			fprintf(f, "%d\n", i);
-		}
-	}
-	
-	fclose(f);
-	
-	/*gmp_fprintf(fout, "Para %Zd los resultados son:\n", n);
+	gmp_fprintf(fout, "Para %Zd los resultados son:\n", n);
 	fprintf(fout, "\tManual: ");
 	if (ret == DEFINITELY_NOT) {
 		fprintf(fout, "Compuesto\n");
@@ -228,10 +207,11 @@ int main (int argc,char *argv[]) {
 		fprintf(fout, "Probablemente\n");
 	} else {
 		fprintf(fout, "Definitivamente\n");
-	}*/
+	}
 	
 	mpz_clear(n);
 	gmp_randclear(state);
 	gmp_randclear(state2);
+	fclose(fout);
 	return 0;
 }
